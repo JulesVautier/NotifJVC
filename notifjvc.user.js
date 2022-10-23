@@ -19,7 +19,6 @@ function getPageNumber(title) {
 
 function decodeHTMLEntities(text) {
     var html = $("<textarea/>").html(text)
-//    return html[0].innerHTML
     return html.text();
 }
 
@@ -38,10 +37,11 @@ function searchAllOccurences(page, message) {
 
 
 class Notification {
-    constructor(topicUrl, message, messageUrl) {
+    constructor(topicUrl, message, position, clicked) {
         this.topicUrl = topicUrl;
         this.message = message;
-        this.messageUrl = messageUrl
+        this.position = position;
+        this.clicked = clicked
     }
 
     exists() {
@@ -61,6 +61,8 @@ class Notification {
 }
 
 var refreshCounters = [60 * 2, 60 * 5, 60 * 10, 60 * 15, 60 * 60, 60 * 60 * 24]
+//refreshCounters = [15, 30, 60, 60 * 15, 60 * 60, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24]
+//refreshCounters = [10, 10]
 
 class Post {
     constructor(topicUrl, text, lastTopicRefreshDate, nextRefreshCounter) {
@@ -69,6 +71,10 @@ class Post {
         this.pagesChecked = getPageNumber(topicUrl)
         this.lastTopicRefreshDate = lastTopicRefreshDate
         this.nextRefreshCounter = nextRefreshCounter
+        if (this.nextRefreshCounter >= refreshCounters.length) {
+            this.nextRefreshCounter = refreshCounters.length - 1
+        }
+
     }
 
     getNextRefreshDate() {
@@ -128,11 +134,12 @@ class Post {
 
         if(req.status == 200) {
             this.messages.forEach(message => {
+//                console.log(req.response)
                 var response = decodeHTMLEntities(req.response)
                 let position = response.search(message)
                 searchAllOccurences(response, message).forEach(position => {
                     if (position != -1 && response[position + message.length + 0] != '\n') {
-                        var notif = new Notification(this.topicUrl, message, position)
+                        let notif = new Notification(this.topicUrl, message, position, false)
                         if (!notif.exists()) {
                             addNotif(notif)
                         }
@@ -173,7 +180,7 @@ function addPost(post) {
     if (existingPost == undefined) {
         posts.push(post)
     } else {
-        existingPost.messages.concat(post.messages)
+        existingPost.messages = existingPost.messages.concat(post.messages)
         existingPost.nextRefreshCounter = post.nextRefreshCounter
     }
     $.cookie(COOKIE_POSTS, JSON.stringify(posts));
@@ -190,7 +197,7 @@ function getNotifs() {
     var notifs_tmp = $.parseJSON(cook)
     var notifs_list = []
     notifs_tmp.forEach(notif_tmp => {
-        notifs_list.push(new Notification(notif_tmp.topicUrl, notif_tmp.message, notif_tmp.messageUrl))
+        notifs_list.push(new Notification(notif_tmp.topicUrl, notif_tmp.message, notif_tmp.position, notif_tmp.clicked))
     })
     notifs = notifs_list
     return notifs
@@ -203,6 +210,13 @@ function addNotif(notif) {
     return notifs
 }
 
+function deleteNotif(position) {
+    console.log("deleteNotif")
+    notifs = getNotifs().filter(notif => notif.position != position)
+    $.cookie(COOKIE_NOTIFS, JSON.stringify(notifs));
+    showNotifs()
+    return notifs
+}
 
 function resetCookies() {
     $.cookie(COOKIE_NOTIFS, JSON.stringify([]));
@@ -247,6 +261,9 @@ function catchSubmit() {
     $(".js-post-topic").click(function() {
         readPost()
     })
+    $(".icon-bell-off").click(function() {
+        showNotifs()
+    })
 }
 
 function addDebug() {
@@ -259,16 +276,38 @@ function addDebug() {
     document.getElementById("Notif").onclick = checkNotifs
 }
 
-
 addDebug()
-catchSubmit();
+
+function initNotifs() {
+    $(".js-header-dropdown-content").last().append("<ul class=NotifList></ul>")
+}
+initNotifs()
+
+function showNotifs() {
+    $(".NotifList").empty()
+    getNotifs().forEach(notif => {
+        if($("#" + notif.position).length == 0) {
+            var notifButtonStr = `<li ><a id="${notif.position}" class=Notif href="${notif.topicUrl}">${notif.message.substring(0, 50)}</a></li>`
+//            var notifButtonStr = `<li><p  id="${notif.position}" class=Notif>${notif.message.substring(0, 50)}</p></li>`
+            $(".NotifList").prepend(notifButtonStr)
+            $("#" + notif.position).bind("click", function() {
+                deleteNotif(notif.position)
+            })
+        }
+    })
+    console.log(getPosts(), getNotifs())
+}
+
 
 function checkNotifs() {
     console.log(getPosts(), getNotifs())
-    var last10Posts = posts.slice(-10);
+//    addNotifs()
+    var last10Posts = posts.slice(-1);
     last10Posts.forEach(post => {
         post.checkQuotedMessages()
         addPost(post)
     })
 }
-setInterval(checkNotifs, 5000)
+
+//setInterval(checkNotifs, 5000)
+catchSubmit();
