@@ -60,13 +60,39 @@ class Notification {
     }
 }
 
+var refreshCounters = [60 * 2, 60 * 5, 60 * 10, 60 * 15, 60 * 60, 60 * 60 * 24]
 
 class Post {
-    constructor(topicUrl, text, lastNotifDate) {
+    constructor(topicUrl, text, lastTopicRefreshDate, nextRefreshCounter) {
         this.topicUrl = topicUrl.split("#")[0];
         this.messages = text;
         this.pagesChecked = getPageNumber(topicUrl)
-        this.lastNotifDate = lastNotifDate
+        this.lastTopicRefreshDate = lastTopicRefreshDate
+        this.nextRefreshCounter = nextRefreshCounter
+    }
+
+    getNextRefreshDate() {
+        return new Date(this.lastTopicRefreshDate.getTime() + refreshCounters[this.nextRefreshCounter] * 1000);
+    }
+
+    setNextRefreshDate() {
+        this.nextRefreshCounter = this.nextRefreshCounter + 1
+        if (this.nextRefreshCounter >= refreshCounters.length) {
+            this.nextRefreshCounter = refreshCounters.length - 1
+        }
+    }
+
+    restartRefreshDate() {
+        this.nextRefreshCounter = 0
+        this.lastTopicRefreshDate = new Date()
+    }
+
+    canRefresh() {
+        if (new Date().getTime() > this.getNextRefreshDate().getTime()) {
+            this.setNextRefreshDate()
+            return true
+        }
+        return false
     }
 
     addMessage(text){
@@ -81,12 +107,17 @@ class Post {
     }
 
     checkQuotedMessages() {
+        if (!this.canRefresh()) {
+            return false
+        }
         if (this.checkQuotedMessagesFromPage(this.topicUrl) == true) {
             var newUrl = this.incrementPage(this.topicUrl)
-//            if (this.checkQuotedMessagesFromPage(this.topicUrl) == true) {
-//                this.topicUrl = newUrl
-//            }
+            if (this.checkQuotedMessagesFromPage(this.topicUrl) == true) {
+                this.topicUrl = newUrl
+                this.restartRefreshDate()
+            }
         }
+        return true
     }
 
     checkQuotedMessagesFromPage(url) {
@@ -128,7 +159,7 @@ function getPosts() {
     var posts_tmp = $.parseJSON(cook)
     var posts_list = []
     posts_tmp.forEach(post_tmp => {
-        posts_list.push(new Post(post_tmp.topicUrl, post_tmp.messages, post_tmp.lastNotifDate))
+        posts_list.push(new Post(post_tmp.topicUrl, post_tmp.messages, new Date(Date.parse(post_tmp.lastTopicRefreshDate)), post_tmp.nextRefreshCounter))
     })
     posts = posts_list
     return posts
@@ -143,6 +174,7 @@ function addPost(post) {
         posts.push(post)
     } else {
         existingPost.messages.concat(post.messages)
+        existingPost.nextRefreshCounter = post.nextRefreshCounter
     }
     $.cookie(COOKIE_POSTS, JSON.stringify(posts));
     return posts
@@ -179,7 +211,7 @@ function resetCookies() {
 
 
 function savePost(topicUrl, text) {
-    var post = new Post(topicUrl, [text], new Date().getTime())
+    var post = new Post(topicUrl, [text], new Date(), 0)
     addPost(post)
 }
 
@@ -224,16 +256,19 @@ function addDebug() {
     $("#DebugNotifJVC").append("<button id='Notif' data-toggle='tooltip' title='DebugNotifJVC' class='btn btn-jv-editor-toolbar' type='button' value='RandomIssou' style='color: #FF0000; padding-top: 10px'>Notif</button>")
     document.getElementById("RandomIssouReload").onclick = readPost
     document.getElementById("Ent").onclick = resetCookies
-    document.getElementById("Notif").onclick = checkQuotes
+    document.getElementById("Notif").onclick = checkNotifs
 }
 
 
 addDebug()
 catchSubmit();
 
-function checkQuotes() {
+function checkNotifs() {
     console.log(getPosts(), getNotifs())
     var last10Posts = posts.slice(-10);
-    last10Posts.forEach(post => {post.checkQuotedMessages()})
+    last10Posts.forEach(post => {
+        post.checkQuotedMessages()
+        addPost(post)
+    })
 }
-//setInterval(checkQuotes, 5000)
+setInterval(checkNotifs, 5000)
