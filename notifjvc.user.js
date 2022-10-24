@@ -4,8 +4,8 @@
 // @version      0.1
 // @description  Get notification when someone quote your message
 // @author       PoissonVache
-// @downloadURL  https://github.com/JulesVautier/NotifJVC/raw/master/notifjvc.user.js
-// @updateURL    https://github.com/JulesVautier/NotifJVC/raw/master/notifjvc.user.js
+// @downloadURL  https://github.com/JulesVautier/NotifJVC/raw/main/notifjvc.user.js
+// @updateURL    https://github.com/JulesVautier/NotifJVC/raw/main/notifjvc.user.js
 // @match        https://www.jeuxvideo.com/forums/*
 // @grant       GM_setValue
 // @grant       GM_getValue
@@ -61,7 +61,7 @@ class Notification {
 }
 
 var refreshCounters = [60 * 2, 60 * 5, 60 * 10, 60 * 15, 60 * 60, 60 * 60 * 24]
-refreshCounters = [1, 30, 60, 60 * 15, 60 * 60, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24]
+//refreshCounters = [1, 30, 60, 60 * 15, 60 * 60, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24]
 //refreshCounters = [10, 10]
 
 class Post {
