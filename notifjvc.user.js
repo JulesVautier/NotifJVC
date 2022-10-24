@@ -14,7 +14,7 @@
 // ==/UserScript==
 
 function getPageNumber(title) {
-    return Number(title.split('-')[3])
+    return Number(title.split('-')[5])
 }
 
 function decodeHTMLEntities(text) {
@@ -61,16 +61,16 @@ class Notification {
 }
 
 var refreshCounters = [60 * 2, 60 * 5, 60 * 10, 60 * 15, 60 * 60, 60 * 60 * 24]
-//refreshCounters = [15, 30, 60, 60 * 15, 60 * 60, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24]
+refreshCounters = [1, 30, 60, 60 * 15, 60 * 60, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24, 60 * 60 * 24]
 //refreshCounters = [10, 10]
 
 class Post {
-    constructor(topicUrl, text, lastTopicRefreshDate, nextRefreshCounter) {
-        this.topicUrl = topicUrl.split("#")[0];
+    constructor(topicUrl, text, lastTopicRefreshDate, nextRefreshCounter, pagesChecked) {
+        this.topicUrl = this.fixTopicUrl(topicUrl)
         this.messages = text;
-        this.pagesChecked = getPageNumber(topicUrl)
         this.lastTopicRefreshDate = lastTopicRefreshDate
         this.nextRefreshCounter = nextRefreshCounter
+        this.pagesChecked = pagesChecked
         if (this.nextRefreshCounter >= refreshCounters.length) {
             this.nextRefreshCounter = refreshCounters.length - 1
         }
@@ -94,8 +94,11 @@ class Post {
     }
 
     canRefresh() {
+        let diff = new Date(this.getNextRefreshDate().getTime()- new Date().getTime())
+        console.log("next refresh in ", diff.getHours(), diff.getMinutes(), diff.getSeconds())
         if (new Date().getTime() > this.getNextRefreshDate().getTime()) {
             this.setNextRefreshDate()
+            console.log("refresh")
             return true
         }
         return false
@@ -105,10 +108,16 @@ class Post {
         this.messages.push(text)
     }
 
-    incrementPage(url) {
-        var tab = url.split('-')
-        var page = Number(tab[3])
-        tab[3] = page + 1
+    fixTopicUrl(topicUrl) {
+        topicUrl = topicUrl.split('#')[0]
+        var tab = topicUrl.split('-')
+        tab[3] = 1
+        return tab.join('-')
+    }
+
+    getUrl(pagesChecked) {
+        var tab = this.topicUrl.split('-')
+        tab[3] = pagesChecked
         return tab.join('-')
     }
 
@@ -116,14 +125,8 @@ class Post {
         if (!this.canRefresh()) {
             return false
         }
-        if (this.checkQuotedMessagesFromPage(this.topicUrl) == true) {
-            var newUrl = this.incrementPage(this.topicUrl)
-            if (this.checkQuotedMessagesFromPage(this.topicUrl) == true) {
-                this.topicUrl = newUrl
-                this.restartRefreshDate()
-            }
-        }
-        return true
+        var newUrl = this.getUrl(this.pagesChecked)
+        return this.checkQuotedMessagesFromPage(newUrl)
     }
 
     checkQuotedMessagesFromPage(url) {
@@ -146,6 +149,10 @@ class Post {
                     }
                 })
             })
+            if (req.response.search("pagi-suivant-actif") != -1) {
+                this.restartRefreshDate()
+                this.pagesChecked = this.pagesChecked + 1
+            }
             return true
         }
         return false
@@ -158,7 +165,7 @@ var notifs = []
 var posts = []
 
 function getPosts() {
-    cook = $.cookie(COOKIE_POSTS)
+    cook = localStorage.COOKIE_POSTS
     if (cook == undefined) {
         posts = []
         return posts
@@ -166,30 +173,40 @@ function getPosts() {
     var posts_tmp = $.parseJSON(cook)
     var posts_list = []
     posts_tmp.forEach(post_tmp => {
-        posts_list.push(new Post(post_tmp.topicUrl, post_tmp.messages, new Date(Date.parse(post_tmp.lastTopicRefreshDate)), post_tmp.nextRefreshCounter))
+        posts_list.push(new Post(post_tmp.topicUrl, post_tmp.messages, new Date(Date.parse(post_tmp.lastTopicRefreshDate)), post_tmp.nextRefreshCounter, post_tmp.pagesChecked))
     })
     posts = posts_list
     return posts
 }
 
+
+function savePost(topicUrl, text) {
+    var post = new Post(topicUrl, [text], new Date(), 0, getPageNumber(topicUrl))
+    addPost(post)
+}
+
 function addPost(post) {
     posts = getPosts()
     var existingPost = posts.find(element => {
-        return String(element.topicUrl) == String(post.topicUrl)
+        console.log(element.topicUrl, post.topicUrl, element.topicUrl == post.topicUrl)
+        return element.topicUrl == post.topicUrl
     })
     if (existingPost == undefined) {
         posts.push(post)
     } else {
-        existingPost.messages = existingPost.messages.concat(post.messages)
+        let new_msg = post.messages.at(-1)
+        if (existingPost.messages.find(msg => msg == new_msg) == undefined) {
+            existingPost.messages.push(new_msg)
+        }
         existingPost.nextRefreshCounter = post.nextRefreshCounter
     }
-    $.cookie(COOKIE_POSTS, JSON.stringify(posts));
+    localStorage.COOKIE_POSTS = JSON.stringify(posts);
     return posts
 }
 
 
 function getNotifs() {
-    cook = $.cookie(COOKIE_NOTIFS)
+    cook = localStorage.COOKIE_NOTIFS
     if (cook == undefined) {
         notifs = []
         return notifs
@@ -206,27 +223,22 @@ function getNotifs() {
 function addNotif(notif) {
     notifs = getNotifs()
     notifs.push(notif)
-    $.cookie(COOKIE_NOTIFS, JSON.stringify(notifs));
+    localStorage.COOKIE_NOTIFS = JSON.stringify(notifs)
     return notifs
 }
 
 function deleteNotif(position) {
     console.log("deleteNotif")
-    notifs = getNotifs().filter(notif => notif.position != position)
-    $.cookie(COOKIE_NOTIFS, JSON.stringify(notifs));
+    let notif = getNotifs().find(notif => notif.position == position)
+    notif.clicked = true
+    localStorage.COOKIE_NOTIFS = JSON.stringify(notifs)
     showNotifs()
     return notifs
 }
 
 function resetCookies() {
-    $.cookie(COOKIE_NOTIFS, JSON.stringify([]));
-    $.cookie(COOKIE_POSTS, JSON.stringify([]));
-}
-
-
-function savePost(topicUrl, text) {
-    var post = new Post(topicUrl, [text], new Date(), 0)
-    addPost(post)
+    localStorage.COOKIE_NOTIFS = JSON.stringify([])
+    localStorage.COOKIE_POSTS = JSON.stringify([])
 }
 
 function getMessage() {
@@ -285,10 +297,9 @@ initNotifs()
 
 function showNotifs() {
     $(".NotifList").empty()
-    getNotifs().forEach(notif => {
+    getNotifs().filter(e => e.clicked == false).forEach(notif => {
         if($("#" + notif.position).length == 0) {
             var notifButtonStr = `<li ><a id="${notif.position}" class=Notif href="${notif.topicUrl}">${notif.message.substring(0, 50)}</a></li>`
-//            var notifButtonStr = `<li><p  id="${notif.position}" class=Notif>${notif.message.substring(0, 50)}</p></li>`
             $(".NotifList").prepend(notifButtonStr)
             $("#" + notif.position).bind("click", function() {
                 deleteNotif(notif.position)
@@ -301,13 +312,12 @@ function showNotifs() {
 
 function checkNotifs() {
     console.log(getPosts(), getNotifs())
-//    addNotifs()
     var last10Posts = posts.slice(-1);
     last10Posts.forEach(post => {
         post.checkQuotedMessages()
-        addPost(post)
     })
+    localStorage.COOKIE_POSTS = JSON.stringify(posts);
 }
 
-//setInterval(checkNotifs, 5000)
+//setInterval(checkNotifs, 10000)
 catchSubmit();
