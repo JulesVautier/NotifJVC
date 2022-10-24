@@ -271,7 +271,7 @@ function catchSubmit() {
         readPost()
     })
     $(".js-post-topic").click(function() {
-        readPost()
+//        readPost()
     })
     $(".icon-bell-off").click(function() {
         showNotifs()
@@ -280,10 +280,11 @@ function catchSubmit() {
 
 function addDebug() {
     $(".jv-editor-toolbar").append("<div id='DebugNotifJVC' class='btn-group'></div>")
-    $("#DebugNotifJVC").append("<button id='RandomIssouReload' data-toggle='tooltip' title='DebugNotifJVC' class='btn btn-jv-editor-toolbar' type='button' value='RandomIssou' style='color: #FF0000; padding-top: 10px'>YAYAYAY</button>")
-    $("#DebugNotifJVC").append("<button id='Ent' data-toggle='tooltip' title='DebugNotifJVC' class='btn btn-jv-editor-toolbar' type='button' value='RandomIssou' style='color: #FF0000; padding-top: 10px'>COKIES</button>")
-    $("#DebugNotifJVC").append("<button id='Notif' data-toggle='tooltip' title='DebugNotifJVC' class='btn btn-jv-editor-toolbar' type='button' value='RandomIssou' style='color: #FF0000; padding-top: 10px'>Notif</button>")
-    document.getElementById("RandomIssouReload").onclick = readPost
+    $(".jv-editor-toolbar").append("<div id='DebugNotifJVC2' class='btn-group'></div>")
+//    $("#DebugNotifJVC").append("<button id='RandomIssouReload' data-toggle='tooltip' title='DebugNotifJVC' class='btn btn-jv-editor-toolbar' type='button' value='RandomIssou' style='color: #FF0000; padding-top: 10px'>YAYAYAY</button>")
+    $("#DebugNotifJVC").append("<button id='Ent' data-toggle='tooltip' title='DebugNotifJVC' class='btn btn-jv-editor-toolbar' type='button' value='RandomIssou' style='color: #FF0000;'>Reset all notifs</button>")
+    $("#DebugNotifJVC2").append("<button id='Notif' data-toggle='tooltip' title='DebugNotifJVC' class='btn btn-jv-editor-toolbar' type='button' value='RandomIssou' style='color: #FF0000;'>Refresh notifs manually</button>")
+//    document.getElementById("RandomIssouReload").onclick = readPost
     document.getElementById("Ent").onclick = resetCookies
     document.getElementById("Notif").onclick = checkNotifs
 }
@@ -294,6 +295,14 @@ function initNotifs() {
     $(".js-header-dropdown-content").last().append("<ul class=NotifList></ul>")
 }
 initNotifs()
+
+function showNotifsIcon() {
+    let nbNotifs = getNotifs().filter(e => e.clicked == false).length
+    let issou = $('.headerAccount__notif')
+    issou.removeClass("headerAccount__notif js-header-menu-dropdown js-header-notif")
+    issou.addClass("headerAccount__pm js-header-menu-dropdown js-header-mp headerAccount__pm--hasNotif")
+    issou.attr("data-val",nbNotifs)
+}
 
 function showNotifs() {
     $(".NotifList").empty()
@@ -317,7 +326,8 @@ function checkNotifs() {
         post.checkQuotedMessages()
     })
     localStorage.COOKIE_POSTS = JSON.stringify(posts);
+    showNotifsIcon()
 }
 
-//setInterval(checkNotifs, 10000)
+setInterval(checkNotifs, 10000)
 catchSubmit();
